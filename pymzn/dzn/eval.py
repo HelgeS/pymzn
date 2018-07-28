@@ -28,8 +28,8 @@ _val_p = re.compile('(?:true|false|\{(?:[\d ,+\-]+)\}'
 
 # multi-dimensional array pattern
 _array_p = re.compile('^\s*(?:array(?P<dim>\d)d\s*\(\s*'
-                      '(?P<indices>([\d\.+\-]+|\{\})'
-                      '(?:\s*,\s*([\d\.+\-]+|\{\}))*)\s*,\s*)?'
+                      '(?P<indices>([\d\.+\-]+|\{\}|\w+)'
+                      '(?:\s*,\s*([\d\.+\-]+|\{\}|\w+))*)\s*,\s*)?'
                       '\[(?P<vals>[\w\s\.,+\-\\\/\*^|\(\)\{\}]*)\]\)?$')
 
 # ratio pattern (used in OptiMathSat)
@@ -115,11 +115,16 @@ def _eval_val(val):
     # integer set
     set_m = _int_set_p.match(val)
     if set_m:
-        vals = set_m.group('vals')
+        vals = set_m.group('vals').strip()
         if vals:
             return _eval_set(vals.split(','))
         return set()
     return None
+
+
+def _array_indices_interpretable(indices):
+    ss = indices.strip().split(",")
+    return not any(s.strip().isalpha() for s in ss)
 
 
 def dzn2dict(dzn, *, rebase_arrays=True):
@@ -163,9 +168,9 @@ def dzn2dict(dzn, *, rebase_arrays=True):
                 vals = array_m.group('vals')
                 vals = _val_p.findall(vals)
                 dim = array_m.group('dim')
-                if dim:  # explicit dimensions
+                indices = array_m.group('indices')
+                if dim and _array_indices_interpretable(indices):  # explicit dimensions and interpretable
                     dim = int(dim)
-                    indices = array_m.group('indices')
                     indices = _eval_indices(indices)
                     assert len(indices) == dim
                 else:  # assuming 1d array based in 1
@@ -186,4 +191,5 @@ def dzn2dict(dzn, *, rebase_arrays=True):
         raise ValueError('Unsupported evaluation for statement:\n'
                          '{}'.format(repr(stmt)))
     return assign
+
 
